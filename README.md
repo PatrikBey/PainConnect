@@ -15,6 +15,15 @@ The scripts require a containerized MRTrix3 version. Here we used the LeAPP proc
 
 #### 1. tractogram preparation
 Transforming the provided <i>.trk</i> tractogram file to MRTrix3 compatible <i>.tck</i> file format. 
+requirements:
+1. python libraries:
+    nibabel
+    DiPY
+
+```python
+
+python /code/convert_tractogram.py
+```
 
 #### 2. Seed / Target ROI tract extraction
 Extracting all tracts starting in <i>seed</i> ROI and ending in <i>target</i> ROI.
