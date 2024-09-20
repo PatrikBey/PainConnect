@@ -12,7 +12,7 @@
 # * Bey, Patrik, Charité Universitätsmedizin Berlin, Berlin Institute of Health
 # 
 #
-# * last update: 2024.09.11
+# * last update: 2024.09.20
 #
 #
 #
@@ -28,7 +28,8 @@
 #
 # STEPS:
 # 1. check if Jülich volume exists, if not, combine all ROI masks.
-#
+# 2.1 create ROI tract subset
+# 2.2 create ROI connectome
 #
 # REQUIREMENTS: 
 # 1. LeAPP structural processing container 
@@ -48,17 +49,6 @@ log_msg() {
 }
 
 
-CheckVariable() {
-    # check if given variable exists in environment
-    # else return error code 1
-    if [ -z "${1}" ]; then
-            log_msg "ERROR:    variable ${1} not found in environment."
-            exit 1
-    fi
-}
-######### DEV #########
-AFC="left-neg04-GS-Area-5M-SPL-54" 
-
 #############################################
 #                                           #
 #              CHECK INPUT                  #
@@ -71,8 +61,6 @@ if [ -z ${Path} ]; then
     fi
     Path='/data'
 fi
-
-CheckVariable ${AFC}
 
 
 
@@ -114,6 +102,8 @@ if [ ! -f "${Path}/Templates/Juelich_parcellation.nii.gz" ]; then
         echo "UPDATE:    adding ROI-${roi} $(basename ${f%.nii.gz})"
         roi=$((roi + 1))
     done
+else
+    log_msg "UPDATE:    using /data/Templates/Juelich_parcellation.nii.gz"
 fi
 
 
@@ -121,38 +111,29 @@ fi
 
 # ---- create corresponding Fraction-Juelich map ---- #
 
-if [ ! -d "${Path}/AreaFractionCC-Juelich" ]; then
-    mkdir -p "${Path}/AreaFractionCC-Juelich/atlas"
-    mkdir -p "${Path}/AreaFractionCC-Juelich/tracts"
+if [ ! -d "${Path}/AreaFractionCCTracts" ]; then
+    mkdir -p "${Path}/AreaFractionCCTracts"
 fi
 
-afc_file=${Path}/AreaFractionCCMasks/${AFC}.nii.gz
-
-# ---- create afc mask inverse ---- #
-fslmaths ${afc_file} \
-    -binv \
-    ${Path}/tmp/afc_mask_tmp.nii.gz
-
-# ---- replace Jülich ROI with acf ROI ---- #
-fslmaths ${Path}/Templates/Juelich_parcellation.nii.gz \
-    -add ${Path}/tmp/afc_mask_tmp.nii.gz \
-    ${Path}/AreaFractionCC-Juelich/atlas/${AFC}.nii.gz
 
 
-
-# ---- create tractogram subset ---- #
-
-tckedit "${Path}/Templates/dTOR_full_tractogram.tck" \
-    "${Path}/AreaFractionCC-Juelich/tracts/${afc}_tract.tck" \
-    -include ${afc_file}
+Files="${Path}/AreaFractionCCMasks/*.nii.gz"
 
 
+for f in ${Files}; do
+    roi=$( basename ${f%.nii.gz})
 
-# ---- create subset connectome ---- #
+    log_msg "UPDATE:    creating connectome for ${roi}"
+    # ---- create tractogram subset ---- #
+    tckedit -force -quiet -nthreads 20 \
+        "${Path}/Templates/dTOR_full_tractogram.tck" \
+        "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
+        -include ${f}
 
-tck2connectome -force -zero_diagonal \
-        "${Path}/AreaFractionCC-Juelich/tracts/${AFC}_tract.tck" \
-        "${Path}/AreaFractionCC-Juelich/atlas/${AFC}.nii.gz" \
-        "${Path}/Connectomes/Juelich_${AFC}_weights.tsv"
+    # ---- create subset connectome ---- #
+    tck2connectome -force -zero_diagonal -quiet \
+        "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
+        "${Path}/Templates/Juelich_parcellation.nii.gz" \
+        "${Path}/Connectomes/Juelich_${roi}_weights.tsv"
 
-    
+done
