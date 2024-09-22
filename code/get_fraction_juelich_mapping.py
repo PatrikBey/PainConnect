@@ -92,6 +92,8 @@ args = parser.parse_args()
 Path = args.path
 Atlas = os.path.join(Path,'Templates',f'{args.atlas}_parcellation.nii.gz')
 AtlasImg = nibabel.load(Atlas).get_fdata()
+AtlasNew = numpy.where(AtlasImg > 281,0,AtlasImg)
+
 MaskFiles = os.listdir(os.path.join(Path,'AreaFractionCCMasks'))
 OutDir = os.path.join(Path, 'AreaFractionCCMappings',args.atlas)
 
@@ -111,17 +113,11 @@ with Bar(f'UPDATE:    computing ROI mapping', max = len(MaskFiles)) as bar:
         check_dim(tmp, AtlasImg)
         tmp = tmp * AtlasImg
         roi_mapping = list(numpy.unique(tmp[tmp>0]).astype(int).astype(str))
+        print(f'{roi_mapping} | {roi}')
+
         roi_names = get_roi_names(roi_mapping, LUT)
         save_json(os.path.join(OutDir,f'{roi}_mapping.json'),roi_names)
         bar.next()
 
 
 log_msg(f'FINISHED:    computing ROI mappings for {args.atlas}')
-
-
-
-
-
-la = numpy.where(AtlasImg>280,1,0).astype(float)
-li = nibabel.Nifti1Image(la, AtlasImg.affine)
-nibabel.save(li,os.path.join(Path, 'Templates/Juelich_remove_python.nii.gz'))
