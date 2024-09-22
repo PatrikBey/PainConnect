@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-# # create_fraction_juellich_maps.sh
+# # create_fraction_juellich_conn.sh
 #
 #
 # * Brain Simulation Section
