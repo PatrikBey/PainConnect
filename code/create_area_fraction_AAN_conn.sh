@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-# # create_fraction_juellich_conn.sh
+# # create_fraction_AAN_conn.sh
 #
 #
 # * Brain Simulation Section
@@ -12,22 +12,18 @@
 # * Bey, Patrik, Charité Universitätsmedizin Berlin, Berlin Institute of Health
 # 
 #
-# * last update: 2024.09.20
+# * last update: 2024.10.07
 #
 #
 #
 # ## Description
 #
 # This script creates the parcellation volumes to compute 
-# connectivity of the Area_Fraction_CC (AFC) masks with the residual Jülich brain atlas.
-# To this end the AFC is integrated into the existing Jülich atlas, replacing 
-# overlapping ROIs of the latter. The resulting parcellation volume is then used
-# to compute connectivty of the reduced streamlines passing through the corresponding
-# AFC ROI.
+# connectivity of the Area_Fraction_CC (AFC) masks with the AAN subcortical atlas.
 #
 #
 # STEPS:
-# 1. check if Jülich volume exists, if not, combine all ROI masks.
+# 1. check if AAN volume exists, if not, combine all ROI masks.
 # 2. create ROI connectome for all ROIs
 #
 # REQUIREMENTS: 
@@ -61,48 +57,49 @@ if [ -z ${Path} ]; then
     Path='/data'
 fi
 
-
+Atlas="Harvard-AAN"
 
 # ---- Create Jüllich Atlas ---- #
 
-if [ ! -f "${Path}/Templates/Juelich_parcellation.nii.gz" ]; then
-    log_msg "UPDATE:    creating Jülich parcellation volume."
-    Files="${Path}/cytoatlas-Juelich/regions_bin_clean/*.nii.gz"
+if [ ! -f "${Path}/Templates/${Atlas}_parcellation.nii.gz" ]; then
+    log_msg "UPDATE:    creating ${Atlas} parcellation volume."
+    Files="${Path}/${Atlas}/roi_masks/*.nii.gz"
         # ---- copy base image ---- #
     cp /data/Templates/Empty.nii.gz \
-        /data/Templates/Juelich_parcellation.nii.gz
-    for f in ${Files}; do
-        fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-        -add ${f} \
-        /data/Templates/Juelich_parcellation.nii.gz
-    done
+        /data/Templates/${Atlas}_parcellation.nii.gz
+    # DEV: Visual Control for overlapping ROIs
+    # for f in ${Files}; do
+    #     fslmaths ${Path}/Templates/${Atlas}_parcellation.nii.gz \
+    #     -add ${f} \
+    #     ${Path}/Templates/${Atlas}_parcellation.nii.gz
+    # done
+    # fslmaths /data/Templates/Juelich_parcellation.nii.gz \
+    # -bin \
+    # /data/Templates/Juelich_parcellation_bin.nii.gz
 
-    fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-    -bin \
-    /data/Templates/Juelich_parcellation_bin.nii.gz
+    # fslmaths /data/Templates/Juelich_parcellation.nii.gz \
+    # -sub /data/Templates/Juelich_parcellation_bin.nii.gz \
+    # /data/Templates/Juelich_remove_voxels.nii.gz
 
-    fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-    -sub /data/Templates/Juelich_parcellation_bin.nii.gz \
-    /data/Templates/Juelich_remove_voxels.nii.gz
-
-    fslmaths /data/Templates/Juelich_remove_voxels.nii.gz \
-    -binv \
-    /data/Templates/Juelich_remove_voxels.nii.gz
+    # fslmaths /data/Templates/Juelich_remove_voxels.nii.gz \
+    # -binv \
+    # /data/Templates/Juelich_remove_voxels.nii.gz
+    ### DEV: End
     
-    touch /data/cytoAtlas-Juelich/LUT.txt
+    touch ${Path}/${Atlas}/LUT.txt
 
     roi=1
     for f in ${Files}; do
-        echo "${roi}    $(basename ${f%.nii.gz})" >> /data/cytoAtlas-Juelich/LUT.txt
+        echo "${roi}    $(basename ${f%.nii.gz})" >> ${Path}/${Atlas}/LUT.txt
         fslmaths ${f} -mul $roi /data/tmp/tmp.nii.gz
-        fslmaths /data/Templates/Juelich_parcellation.nii.gz \
+        fslmaths ${Path}/Templates/${Atlas}_parcellation.nii.gz \
         -add /data/tmp/tmp.nii.gz \
-        /data/Templates/Juelich_parcellation.nii.gz
+        /data/Templates/${Atlas}_parcellation.nii.gz
         echo "UPDATE:    adding ROI-${roi} $(basename ${f%.nii.gz})"
         roi=$((roi + 1))
     done
 else
-    log_msg "UPDATE:    using /data/Templates/Juelich_parcellation.nii.gz"
+    log_msg "UPDATE:    using /data/Templates/${Atlas}_parcellation.nii.gz"
 fi
 
 
@@ -123,16 +120,16 @@ for f in ${Files}; do
     roi=$( basename ${f%.nii.gz})
 
     log_msg "UPDATE:    creating connectome for ${roi}"
-    # ---- create tractogram subset ---- #
-    tckedit -force -quiet -nthreads 20 \
-        "${Path}/Templates/dTOR_full_tractogram.tck" \
-        "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
-        -include ${f}
 
     # ---- create subset connectome ---- #
     tck2connectome -force -zero_diagonal -quiet \
         "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
-        "${Path}/Templates/Juelich_parcellation.nii.gz" \
-        "${Path}/Connectomes/Juelich_${roi}_weights.tsv"
+        "${Path}/Templates/${Atlas}_parcellation.nii.gz" \
+        "${Path}/Connectomes/${Atlas}_${roi}_weights.tsv"
 
 done
+
+tck2connectome -force -zero_diagonal \
+    "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
+    "${Path}/Templates/${Atlas}_parcellation.nii.gz" \
+    "${Path}/Connectomes/${Atlas}_${roi}_weights.tsv"

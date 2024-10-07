@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-# # create_fraction_juellich_conn.sh
+# # create_fraction_morel_conn.sh
 #
 #
 # * Brain Simulation Section
@@ -12,14 +12,14 @@
 # * Bey, Patrik, Charité Universitätsmedizin Berlin, Berlin Institute of Health
 # 
 #
-# * last update: 2024.09.20
+# * last update: 2024.10.07
 #
 #
 #
 # ## Description
 #
 # This script creates the parcellation volumes to compute 
-# connectivity of the Area_Fraction_CC (AFC) masks with the residual Jülich brain atlas.
+# connectivity of the Area_Fraction_CC (AFC) masks with the Morel subcortical atlas.
 # To this end the AFC is integrated into the existing Jülich atlas, replacing 
 # overlapping ROIs of the latter. The resulting parcellation volume is then used
 # to compute connectivty of the reduced streamlines passing through the corresponding
@@ -27,7 +27,7 @@
 #
 #
 # STEPS:
-# 1. check if Jülich volume exists, if not, combine all ROI masks.
+# 1. check if Morel volume exists, if not, combine all ROI masks.
 # 2. create ROI connectome for all ROIs
 #
 # REQUIREMENTS: 
@@ -66,16 +66,19 @@ fi
 # ---- Create Jüllich Atlas ---- #
 
 if [ ! -f "${Path}/Templates/Juelich_parcellation.nii.gz" ]; then
-    log_msg "UPDATE:    creating Jülich parcellation volume."
-    Files="${Path}/cytoatlas-Juelich/regions_bin_clean/*.nii.gz"
+    log_msg "UPDATE:    creating Morel parcellation volume."
+    Files="${Path}/MorelAtlasMNI152/1mm/*.nii.gz"
         # ---- copy base image ---- #
     cp /data/Templates/Empty.nii.gz \
-        /data/Templates/Juelich_parcellation.nii.gz
+        /data/Templates/Morel_parcellation.nii.gz
     for f in ${Files}; do
-        fslmaths /data/Templates/Juelich_parcellation.nii.gz \
+        fslmaths /data/Templates/Morel_parcellation.nii.gz \
         -add ${f} \
-        /data/Templates/Juelich_parcellation.nii.gz
+        /data/Templates/Morel_parcellation.nii.gz
     done
+
+####
+# ADD EXPLICIT CHECK OF OVERLAPPING VOXELS #
 
     fslmaths /data/Templates/Juelich_parcellation.nii.gz \
     -bin \
