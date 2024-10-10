@@ -20,10 +20,6 @@
 #
 # This script creates the parcellation volumes to compute 
 # connectivity of the Area_Fraction_CC (AFC) masks with the residual Jülich brain atlas.
-# To this end the AFC is integrated into the existing Jülich atlas, replacing 
-# overlapping ROIs of the latter. The resulting parcellation volume is then used
-# to compute connectivty of the reduced streamlines passing through the corresponding
-# AFC ROI.
 #
 #
 # STEPS:
@@ -34,6 +30,26 @@
 # 1. LeAPP structural processing container 
 #    (or similar container for FSL & MRTRix based processing)
 # 2. ROI nifti volume masks
+#
+#
+# USAGE:
+# 1. docker container call with mounted STUDYFOLDER
+# example:
+# docker run -it \
+#    -v /STUDYFOLDER:/data \
+#    leapp:processing bash
+#
+# --- expected input directory
+#
+# ./STUDYTFOLDER
+#   -./Templats
+#        -./Empty.nii.gz         | empty nifti volume with same MNI152 space orientation
+#    -./cytoatlas-Juelich        | directory containg atlas files
+#    -./AreaFractionCCMasks      | directory containing Area-Fraction-CC mask volumes
+#    -./AreaFractionCCTract      | directory containing Area-Fraction-CC tract volumes 
+#                                  [ if not present will be created during loop ]
+
+
 
 #############################################
 #                                           #
@@ -69,40 +85,44 @@ if [ ! -f "${Path}/Templates/Juelich_parcellation.nii.gz" ]; then
     log_msg "UPDATE:    creating Jülich parcellation volume."
     Files="${Path}/cytoatlas-Juelich/regions_bin_clean/*.nii.gz"
         # ---- copy base image ---- #
-    cp /data/Templates/Empty.nii.gz \
-        /data/Templates/Juelich_parcellation.nii.gz
+    cp ${Path}/Templates/Empty.nii.gz \
+        ${Path}/Templates/Juelich_parcellation.nii.gz
     for f in ${Files}; do
-        fslmaths /data/Templates/Juelich_parcellation.nii.gz \
+        fslmaths ${Path}/Templates/Juelich_parcellation.nii.gz \
         -add ${f} \
-        /data/Templates/Juelich_parcellation.nii.gz
+        ${Path}/Templates/Juelich_parcellation.nii.gz
     done
 
-    fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-    -bin \
-    /data/Templates/Juelich_parcellation_bin.nii.gz
+    # ---- snippets for overlap validation ---- #
+    # fslmaths ${Path}/Templates/Juelich_parcellation.nii.gz \
+    # -bin \
+    # ${Path}/Templates/Juelich_parcellation_bin.nii.gz
 
-    fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-    -sub /data/Templates/Juelich_parcellation_bin.nii.gz \
-    /data/Templates/Juelich_remove_voxels.nii.gz
+    # fslmaths ${Path}/Templates/Juelich_parcellation.nii.gz \
+    # -sub ${Path}/Templates/Juelich_parcellation_bin.nii.gz \
+    # ${Path}/Templates/Juelich_remove_voxels.nii.gz
 
-    fslmaths /data/Templates/Juelich_remove_voxels.nii.gz \
-    -binv \
-    /data/Templates/Juelich_remove_voxels.nii.gz
+    # fslmaths ${Path}/Templates/Juelich_remove_voxels.nii.gz \
+    # -binv \
+    # ${Path}/Templates/Juelich_remove_voxels.nii.gz
     
-    touch /data/cytoAtlas-Juelich/LUT.txt
+    touch ${Path}/cytoAtlas-Juelich/LUT.txt
 
+    if [ ! -d ${Path}/tmp ]; then
+        mkdir -p ${Path}/tmp
+    fi
     roi=1
     for f in ${Files}; do
-        echo "${roi}    $(basename ${f%.nii.gz})" >> /data/cytoAtlas-Juelich/LUT.txt
-        fslmaths ${f} -mul $roi /data/tmp/tmp.nii.gz
-        fslmaths /data/Templates/Juelich_parcellation.nii.gz \
-        -add /data/tmp/tmp.nii.gz \
-        /data/Templates/Juelich_parcellation.nii.gz
+        echo "${roi}    $(basename ${f%.nii.gz})" >> ${Path}/cytoAtlas-Juelich/LUT.txt
+        fslmaths ${f} -mul $roi ${Path}/tmp/tmp.nii.gz
+        fslmaths ${Path}/Templates/Juelich_parcellation.nii.gz \
+        -add ${Path}/tmp/tmp.nii.gz \
+        ${Path}/Templates/Juelich_parcellation.nii.gz
         echo "UPDATE:    adding ROI-${roi} $(basename ${f%.nii.gz})"
         roi=$((roi + 1))
     done
 else
-    log_msg "UPDATE:    using /data/Templates/Juelich_parcellation.nii.gz"
+    log_msg "UPDATE:    using ${Path}/Templates/Juelich_parcellation.nii.gz"
 fi
 
 
@@ -110,25 +130,26 @@ fi
 
 # ---- create corresponding Fraction-Juelich map ---- #
 
+Files="${Path}/AreaFractionCCMasks/*.nii.gz"
+
 if [ ! -d "${Path}/AreaFractionCCTracts" ]; then
     mkdir -p "${Path}/AreaFractionCCTracts"
+    for f in ${Files}; do
+        roi=$( basename ${f%.nii.gz})
+        log_msg "UPDATE:    creating connectome for ${roi}"
+        # ---- create tractogram subset ---- #
+        tckedit -force -quiet -nthreads 20 \
+            "${Path}/Templates/dTOR_full_tractogram.tck" \
+            "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
+            -include ${f}
+    done
 fi
-
-
-
-Files="${Path}/AreaFractionCCMasks/*.nii.gz"
 
 
 for f in ${Files}; do
     roi=$( basename ${f%.nii.gz})
 
     log_msg "UPDATE:    creating connectome for ${roi}"
-    # ---- create tractogram subset ---- #
-    tckedit -force -quiet -nthreads 20 \
-        "${Path}/Templates/dTOR_full_tractogram.tck" \
-        "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
-        -include ${f}
-
     # ---- create subset connectome ---- #
     tck2connectome -force -zero_diagonal -quiet \
         "${Path}/AreaFractionCCTracts/${roi}_tract.tck" \
