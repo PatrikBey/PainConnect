@@ -160,7 +160,7 @@ get_roi_volume() {
         ${TempDir}/tmp-parc.nii.gz
     fslmaths ${TempDir}/tmp-parc.nii.gz \
         -add ${1} \
-        ${TempDir}/tmp-parc.nii.gz
+        ${TempDir}/tmp-parc.nii.gz 2>/dev/null
 }
 
 get_tract_subset() {
@@ -201,7 +201,7 @@ get_assignments() {
         "${3}" \
         "${TempDir}/tmp-parc.nii.gz" \
         "${TempDir}/weights/${target_roi}_weights.tsv" \
-        -out_assignment "${TempDir}/assignments/${target_roi}.csv"
+        -out_assignment "${TempDir}/assignments/${target_roi}.csv" 2>/dev/null
 }
 
 get_strength(){
@@ -222,6 +222,25 @@ combine_weights() {
     python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${1}
 }
 
+combine_weights() {
+    # create concatenated connectivity matrix for all ROIs
+    #
+    # ${1}: output filename
+    weight_files="${TempDir}/*.tsv"
+    paste ${weight_files} > ${TempDir}/weights.tsv
+    python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${1}
+}
+    files="${1}/roi_masks/*.nii.gz"
+    touch "${1}/LUT.txt"
+    roi=1
+    for f in ${files}; do
+        roi_label=$( basename ${f%.nii.gz})
+        echo "${roi}    ${roi_label}" >> ${1}/LUT.txt
+        roi=$((roi + 1))
+    done
+
+
+
 get_binary_volume() {
     # create a binary volume combining all ROIs
     # for reduction of normative tractogram to 
@@ -236,7 +255,7 @@ get_binary_volume() {
     for f in $files; do
         fslmaths ${TempDir}/${1}_ribbon.nii.gz \
             -add ${f} \
-            ${TempDir}/${1}_ribbon.nii.gz
+            ${TempDir}/${1}_ribbon.nii.gz 2>/dev/null
     done
     # ---- binarize volume
     fslmaths ${TempDir}/${1}_ribbon.nii.gz \
@@ -328,6 +347,20 @@ if [ ${roi_mode,,} = "single" ]; then
     combine_weights ${Path}/Connectomes/${rois_seed}_${rois_target}_weights.tsv
 fi
 
+
+
+#######    DEVELOPMENT ADD ROI COLUMN / ROWNAMES
+# combine_weights() {
+#     # create concatenated connectivity matrix for all ROIs
+#     #
+#     # ${1}: output filename
+#     weight_files="${TempDir}/*.tsv"
+#     paste ${rois_target}/LUT.txt ${weight_files} > ${TempDir}/weights.tsv
+#     python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${TempDir}/weights2.tsv
+#     paste ${rois_seed}/LUT.txt ${TempDir}/weights2.tsv > ${Path}/Connectomes/${rois_seed}_${rois_target}_weights.tsv
+# }
+
+
 # elif [ ${roi_mode,,} = "full" ]; then
 #     log_msg "LASDLALSDAOFAMSDLAMSDK"
 # else
@@ -339,11 +372,3 @@ if [ ${cleanup,,} = "true" ];
     rm -r ${TempDir}
 fi
 
-
-# docker run \
-#     -v ${PWD}:/code \
-#     -v /Volumes/DataShield/Data/PainConn:/data \
-#     -e rois_seed="AreaFractionCC" \
-#     -e rois_target="Harvard-AAN" \
-#     leapp:old \
-#     bash /code/roi2roi_connectivity.sh

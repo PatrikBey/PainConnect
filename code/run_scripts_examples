@@ -1,0 +1,37 @@
+
+#### PRCESSING PLAN
+
+(1) Zeile Area-Fraction / Spalte alle Area-Fractions
+(2) Zeile Area-Fraction / Spalte Jülich-Atlas ROIs {100x280:500h}
+(3) Zeile Area-Fraction / Spalte Morel-Atlas ROIs
+(4) Zeile Area-Fraction / Spalte AAN ROIs           [done]
+(5) Zeile Area-Fraction / Spalte BN ROIs? 
+(6) Zeile BrainstemNavigator / Spalte Morel-Atlas
+
+
+docker run \
+    -v ${PWD}:/code \
+    -v /Volumes/DataShield/Data/PainConn:/data \
+    -e rois_seed="AreaFractionCC" \
+    -e rois_target="MorelAtlasMNI152" \
+    leapp:old \
+    bash /code/roi2roi_connectivity.sh
+
+
+
+
+# (2)
+### -e rois_target="cytoatlas-Juelich" \ ###
+#
+#     WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+# Fri Oct 11 10:55:53 UTC 2024 roi2roi_connectivity.sh :  computing ROI2ROI connectivity for seed and target list.
+# Fri Oct 11 10:55:53 UTC 2024 roi2roi_connectivity.sh :  no <<cleanup>> variable defined, using default True.
+# Fri Oct 11 10:55:53 UTC 2024 roi2roi_connectivity.sh :  compute look-up table for cytoatlas-Juelich
+# Fri Oct 11 10:55:57 UTC 2024 roi2roi_connectivity.sh :  create target ROIs binary mask for tract reduction.
+# Fri Oct 11 10:58:55 UTC 2024 roi2roi_connectivity.sh :  extracting target ROI tract subset.
+# tckedit: /opt/matlabmcr-2016b/v91/bin/glnxa64/libtiff.so.5: no version information available (required by /opt/mrtrix3/bin/../lib/libmrtrix.so)
+# Fri Oct 11 11:01:56 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-5M-SPL-54
+# Fri Oct 11 15:52:05 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-6d2-PreCG-24
+# Fri Oct 11 20:45:29 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-OP1-POperc-59
+# Sat Oct 12 01:37:48 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-OP4-POperc-62
+# Sat Oct 12 06:28:45 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-PF-IPL-39
