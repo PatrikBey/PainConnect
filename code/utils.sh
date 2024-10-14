@@ -36,50 +36,48 @@
 # 1. show_usage
 
 show_usage() {
-  figlet "DeepStroke - GCN" | lolcat 
+  figlet "ROI2ROI" | lolcat 
 	cat <<EOF
 
 * author:       Patrik Bey
-* last update:  2024/08/23
+* last update:  2024/10/14
+
+STRUCTURAL CONNECTIVITY FOR FUNCTIONAL NETWORKS OF PAIN
+
 
 --- documentation ---
-This container performs model training and prediction for a given
-disconnectome data set with the purpose of prediction long term recovery.
 
-Input:
-* Data set of connectivity matrices following BIDS 
-  standard for computational modelling (Schirner & Ritter, 2023) with <<filename>> variable
-  for disconnectome file to read
-* participant.tsv file containing recovery group 
-  (class label) for each participant
+--- usage ---
 
-Output:
-* F1-score for prediction performance for each cross-validation run [F1.tsv]
-* Loss value across epochs for training and testing [training_loss.tsv, test_loss.tsv]
-* Final prediction labels for each participant [predictions.tsv]
-
---- container usage ---
-docker run \
-    -v /PATH/TO/DATA:/data \
-    -e predict=True \
-    -e filename=<<filename>> \
-    -e initialize=True \
-    gsp:latest
-
+docker run ...
 
 --- variables ---
 
-predict [optional]      :   run training and prediction of GCN model 
-                            after running intialization step
-filename [optional]     :   disconnectome filename string e.g. 'avg-disconnectome' to read
-                            all subject files {sub-ID}_avg_disconnectome.tsv          
-initialize [optional]   :   initialize model training, includes completeness check,
-                            dataset creation, label formatting
-param                   :   json style ditionary of model parameters 
-                            to replace default values.   
+<<seed>>   name of set of ROIs to use as initial ROIs for connectivity
+                {required} | [represents rows in conenctivity matrix]
+
+<<target>> name of set of ROIs to use as secondary ROIs 
+                for connectivity
+                {optional} | [represents columns in connectivity matrix]
+
+<<cleanup>>     boolean whether to remove temporary files
+                {optional} | [default: True >> removing temp-directory]
+
+
+--- input ---
+
+expected input file structure:
+
+/STUDYFOLDER
+    |_rois_seed
+        |_roi_masks
+    |_rois_target
+        |_roi_masks
+
 EOF
 	# exit 1
 }
+
 
 # 2. log_msg
 log_msg() {
@@ -98,3 +96,23 @@ check_variable() {
         exit 1
     fi
 }
+
+get_temp_dir(){
+# create temporary directory
+    randID=$RANDOM
+    export TempDir="${1}/temp-${randID}"
+    mkdir ${TempDir}
+}
+
+progress_bar() {
+    # print a progress bar during loops
+    # ${1} current iteration of loop
+    # ${2} total length of loop
+    let _progress=(${1}*100/${2}*100)/100
+    let _done=(${_progress}*4)/10
+    let _left=40-$_done
+    _fill=$(printf "%${_done}s")
+    _empty=$(printf "%${_left}s")
+    printf "\rProgress : [${_fill// /#}${_empty// /-}] ${_progress}%%"
+}
+

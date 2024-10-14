@@ -241,27 +241,6 @@ combine_weights() {
 
 
 
-get_binary_volume() {
-    # create a binary volume combining all ROIs
-    # for reduction of normative tractogram to 
-    # reduce computational cost
-    #
-    # ${1}: Target ROIs
-    # ---- create initial empty volume
-    cp ${Path}/Templates/Empty.nii.gz \
-    ${TempDir}/${1}_ribbon.nii.gz
-    # ---- concatenate ROI masks
-    files="${Path}/${1}/roi_masks/*.nii.gz"
-    for f in $files; do
-        fslmaths ${TempDir}/${1}_ribbon.nii.gz \
-            -add ${f} \
-            ${TempDir}/${1}_ribbon.nii.gz 2>/dev/null
-    done
-    # ---- binarize volume
-    fslmaths ${TempDir}/${1}_ribbon.nii.gz \
-        -bin \
-        ${TempDir}/${1}_ribbon_bin.nii.gz
-}
 #############################################
 #                                           #
 #              CHECK INPUT                  #

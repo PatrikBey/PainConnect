@@ -1,20 +1,29 @@
 
 #### PRCESSING PLAN
 
-(1) Zeile Area-Fraction / Spalte alle Area-Fractions
-(2) Zeile Area-Fraction / Spalte Jülich-Atlas ROIs {100x280:500h}
-(3) Zeile Area-Fraction / Spalte Morel-Atlas ROIs
-(4) Zeile Area-Fraction / Spalte AAN ROIs           [done]
-(5) Zeile Area-Fraction / Spalte BN ROIs? 
-(6) Zeile BrainstemNavigator / Spalte Morel-Atlas
+# (1) Zeile Area-Fraction / Spalte alle Area-Fractions
+# (2) Zeile Area-Fraction / Spalte Jülich-Atlas ROIs {100x280:500h}
+# (3) Zeile Area-Fraction / Spalte Morel-Atlas ROIs
+# (4) Zeile Area-Fraction / Spalte AAN ROIs           [done]
+# (5) Zeile Area-Fraction / Spalte BN ROIs? 
+# (6) Zeile BrainstemNavigator / Spalte Morel-Atlas
+
+
+
+# Priorities:
+# (3)
+# (5)
+# (1)
+# (6)
+# (2)
 
 
 docker run \
     -v ${PWD}:/code \
-    -v /Volumes/DataShield/Data/PainConn:/data \
+    -v /mnt/h/Research/PainConn/Data:/data \
     -e rois_seed="AreaFractionCC" \
-    -e rois_target="MorelAtlasMNI152" \
-    leapp:old \
+    -e rois_target="Harvard-AAN" \
+    leapp:proc.dev \
     bash /code/roi2roi_connectivity.sh
 
 

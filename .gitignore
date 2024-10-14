@@ -1,0 +1,3 @@
+# ignore files of type
+*.nii.gz
+*.tck

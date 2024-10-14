@@ -27,64 +27,9 @@
 # * 1. subsetting existing Tractogram (from DWITractogram.sh)
 #
 # REQUIREMENTS: 
-# 1. LeAPP structural processing container
-# 2. Template connectome .tck file
+# 1. ROI2ROI docker container [or quivalent]
+
 # 3. ROI nifti volume mask(s)
-
-#############################################
-#                                           #
-#                FUNCTIONS                  #
-#                                           #
-#############################################
-
-
-show_usage() {
-	cat <<EOF
-
-***     ROI BASED TRACTOGRAM CREATION     ***
-
-    Wrapper script for use with docker container call
-    such as LeAPP processing container (1.)
-
-
-# USAGE
-
-docker run \
-    -v /STUDYFOLDER:/data \
-    -e Mask="ROI-MASK-1-FILENAME"
-    -e Template="TEMPLATE-TRACTOGRAM-FILENAME" \
-    get_tracts.sh
-
-#-- input variables --#
-    -e Mask [required]      string; comma seperated if multiple nifti volumes provided
-    -e Template [optional]  string; filename of template .tck file. if not provided default
-                            dTOR_full_tractogram.tck will be used (2.)
-
-
-
-# References
-(1.) Bey et al., (2024), https://doi.org/10.1002/hbm.26701
-(2.) Elias et al., (2024), https://doi.org/10.6084/m9.figshare.c.6844890.v1
-
-EOF
-	exit 1
-}
-
-
-
-
-contains() {
-    if [[ ${1} == *","* ]]; then
-        echo true
-    fi
-}
-
-get_count() {
-    # extract tract count from given .tck file
-    tck_info=$( tckinfo ${1})
-    info_split=(${tck_info//" "/ })
-    echo ${info_split[18]}
-}
 
 
 
@@ -94,134 +39,99 @@ get_count() {
 #                                           #
 #############################################
 
-#-------loading I/O & logging functionality-------#
-source ${HCPPIPEDIR}/global/scripts/log.shlib  # Logging related functions
+# ---- loading I/O & logging functionality ---- #
+source ${SRCDIR}/utils.sh
+source ${SRCDIR}/functions.sh
+
+# ---- parse input variables ---- #
 
 if [[ ! -d "/data" ]]; then
-    log_Msg "ERROR:    no <</data>> directory mounted into container."
+    log_msg "ERROR:    no <</data>> directory mounted into container."
+    show_usage
+else
+    Path="/data"
+fi
+
+if [[ -z ${seed} ]]; then
+    log_msg "ERROR:    no <<seed>> variable defined."
     show_usage
 fi
 
-if [[ -z ${Mask} ]]; then
-    log_Msg "ERROR:    no <<Mask>> variable defined."
-    show_usage
-fi
 
-if [[ -z ${OutDir} ]]; then
-    log_Msg "UPDATE:    no output directory <<OutDir>> defined. USing default '/data/tracts'."
-    OutDir="/data/tracts"
+if [[ -z ${target} ]]; then
+    log_msg "ERROR:    no <<target>> variable defined."
+    show_usage
 fi
 
 if [[ -z ${Template} ]]; then
-    log_Msg "UPDATE:    no <<Template>> defined. Using default tractogram '/data/Templates/dTOR_full_tractogram.tck'"
-    Template="/data/Templates/dTOR_full_tractogram.tck"
+    log_msg "UPDATE:    no <<Template>> defined. Using default tractogram '/data/Templates/dTOR_full_tractogram.tck'"
+    Template="${TEMPLATEDIR}/dTOR_full_tractogram.tck"
 fi
 
-# ---- check if mutliple ROI masks provided ---- #
-MultiMask=$( contains ${mask} )
-
-
-
-
-########### DEVELOPMENT ############
-Template="/data/Templates/testing.tck"
-MNI="/data/Templates/MNI152_T1_1mm.nii.gz"
-Mask="/data/AreaFractionCCMasks/left-neg04-GS-Area-5M-SPL-54.nii.gz"
-ROI1="/data/AreaFractionCCMasks/left-neg04-GS-Area-5M-SPL-54.nii.gz"
-# ROI2="/data/AreaFractionCCMasks/left-neg04-IC-Area-5L-SPL-53.nii.gz"
-ROI2="/data/AreaFractionCCMasks/left-pos04-IC-Area-Id2-Insula-72.nii.gz"
-# ROI2="/data/AreaFractionCCMasks/left-neg04-IC-Area-5M-SPL-54.nii.gz"
-# ---- check if output directory exists ---- #
-
-if [[ ! -d ${OutDir} ]]; then
-    mkdir -p ${OutDir}
-    mkdir -p ${OutDir}/exclusion
-fi
-
-# ---- split single vs multi ROI processing ---- #
-if [[ ${MultiMask} ]]; then
-    log_Msg "UPDATE:    running multiple ROI extraction."
-    OutFile="${OutDir}/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz}).tck"
+if [ -d "${Path}/${seed}" ]; then
+    log_msg "UPDATE:    running full roi2roi connectivity for seed ROI set."
+    roi_mode="full"
+elif [ -f "${Path}/${seed}" ]; then
+    log_msg "UPDATE:    running single seed ROI connectivity."
+    roi_mode="single"
 else
-    log_Msg "UPDATE:    running single ROI tract extractions"
-    OutFile="${OutDir}/$( basename ${Mask%.nii.gz}).tck"
+    log_msg "ERROR:    can't find corresponding ROI seed file/directory."
+    show_usage
 fi
 
 
 
-tckedit -force -quiet \
-    ${Template} \
-    ${OutFile} \
-    -include ${Mask}
+#############################################
+#                                           #
+#          PERFORM COMPUTATIONS             #
+#                                           #
+#############################################
+
+# ---- intialize logging ---- #
+log_msg "START:    Processing of $( basename ${seed} ) and ${target}" | lolcat
+
+# ---- initialize workspace ---- #
+get_temp_dir ${Path}
 
 
-# ---- MULTI ROI TRACTOGRAPHY ---- #
+if [ ${roi_mode} = "full" ]; then
 
-OutFile="${OutDir}/$( basename ${ROI1%.nii.gz}).tck"
-tckedit -force \
-    ${Template} \
-    ${OutFile} \
-    -include ${ROI1}
+    if [ ! -f "${Path}/${rois_seed}/LUT.txt" ]; then
+        log_msg "UPDATE:    compute look-up table for ${rois_seed}"
+        get_lookup_table /data/${rois_seed}
+    fi
 
-OutFile="${OutDir}/$( basename ${ROI2%.nii.gz}).tck"
-tckedit -force \
-    ${Template} \
-    ${OutFile} \
-    -include ${ROI2}
+    rois_seed_list="${Path}/${rois_seed}/roi_masks/*.nii.gz"
 
-tckedit "${OutDir}/$( basename ${ROI1%.nii.gz}).tck" \
-    "${OutDir}/$( basename ${ROI2%.nii.gz}).tck" \
-    "${OutDir}/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz}).tck"
+else 
 
-tckedit "${OutDir}/$( basename ${ROI1%.nii.gz}).tck" \
-    "${OutDir}/$( basename ${ROI2%.nii.gz}).tck" \
-    "${OutDir}/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz})_include_ends.tck" \
-    -include ${ROI1} \
-    -include ${ROI2} \
-    -ends_only
+    rois_seed_list="${seed}"
 
-tckedit -force \
-    ${Template} \
-    "${OutDir}/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz})_include_ends.tck" \
-    -include ${ROI1} \
-    -include ${ROI2} \
-    -ends_only
-
-tckedit -force \
-    ${Template} \
-    "${OutDir}/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz})_include_order.tck" \
-    -include_ordered ${ROI1} \
-    -include_ordered ${ROI2}
+fi
 
 
-
-# ---- create exclusion mask ---- #
-# fslmaths ${ROI1} \
-#     -add ${ROI2} \
-#     /data/tracts/exclusion/tmp.nii.gz
-
-# fslmaths /data/Templates/Binary.nii.gz \
-#     -sub /data/tracts/exclusion/tmp.nii.gz \
-#     /data/tracts/exclusion/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz}).nii.gz
-
-# fslmaths /data/Templates/MNI152_T1_1mm.nii.gz \
-#     -sub ${ROI1} \
-#     /data/tracts/exclusion/$( basename ${ROI1})
+# ---- prepare target metadata ---- #
+if [ ! -f "${Path}/${target}/LUT.txt" ]; then
+    log_msg "UPDATE:    compute look-up table for ${target}"
+    get_lookup_table "${Path}/${target}"
+fi
 
 
-# tckedit -force \
-#     ${Template} \
-#     ${OutFile} \
-#     -include ${ROI1} \
-#     -include ${ROI2} \
-#     -exclude /data/tracts/exclusion/$( basename ${ROI1%.nii.gz})-$( basename ${ROI2%.nii.gz}).nii.gz
+# ---- create binary mask of all target ROIs ---- #
+
+log_msg "UPDATE:    create target ROIs binary mask for tract reduction."
+get_binary_volume ${rois_target}
+
+# ---- reduce normative tractogram ---- #
+
+log_msg "UPDATE:    extracting target ROI tract subset."
+get_tract_subset ${TempDir}/${rois_target}_ribbon_bin.nii.gz
+
+rois_target_list="${Path}/${rois_target}/roi_masks/*.nii.gz"
 
 
 
-fslmaths $MNI \
--bin \
-/data/Templates/Binary.nii.gz
 
 
--mul ${ROI1%.nii.gz}_reoriented.nii.gz \
-/data/test2.nii.gz
+
+log_msg "FINISHED:    Processing of $( basename ${seed} ) and ${target}" | lolcat
