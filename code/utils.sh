@@ -49,7 +49,11 @@ STRUCTURAL CONNECTIVITY FOR FUNCTIONAL NETWORKS OF PAIN
 
 --- usage ---
 
-docker run ...
+docker run \
+    -v /PATH/TO/STUDYFOLDER:/data \
+    -e seed="SeedROIs" \
+    -e target="TargetROIs" \
+    roi2roi
 
 --- variables ---
 
@@ -60,9 +64,19 @@ docker run ...
                 for connectivity
                 {optional} | [represents columns in connectivity matrix]
 
+<<template>>    template tractogram in same space as <seed> and <target>.
+                {optional} | [default: dTOR_full_tractogram.tck (Elias et al. (2024))]
+
+<<preproc>>     boolean whether to perform preprocessing as required for
+                single seed ROI connectivity computations. Has to be set to "only" once before
+                running single ROI connectivity computations
+                {optional} | [default: True]
+
 <<cleanup>>     boolean whether to remove temporary files
                 {optional} | [default: True >> removing temp-directory]
 
+<<CLUSTER>>     boolean whether container is run on HPC cluster to adjust logging functions.
+                {optional} | [default: False >> ussing color coded logging]
 
 --- input ---
 
@@ -75,15 +89,24 @@ expected input file structure:
         |_roi_masks
 
 EOF
-	# exit 1
+	exit 1
 }
 
 
 # 2. log_msg
 log_msg() {
     # print out text for logging
-    _message=$( echo ${1} | cut -d':' -f2 )
-    echo -e "$(date) $(basename  -- "$0") : ${_message}"
+    _type=$( echo ${1} | cut -d'|' -f1 )
+    _message=${1}
+    if [[ ${CLUSTER,,} = "true" ]]; then
+        echo -e "\n$(date) $(basename  -- "$0") | ${_message}"
+    else
+        if [[ ${_type,,} = "start " ]] || [[ ${_type,,} = "finished " ]] || [[ ${_type,,} = "error " ]]; then
+            echo -e "\n$(date) $(basename  -- "$0") | ${_message}" | lolcat
+        else
+            echo -e "\n$(date) $(basename  -- "$0") | ${_message}"
+        fi
+    fi
 }
 
 # 3. check_variable

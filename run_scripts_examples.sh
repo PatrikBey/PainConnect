@@ -5,7 +5,7 @@
 # (2) Zeile Area-Fraction / Spalte Jülich-Atlas ROIs {100x280:500h}
 # (3) Zeile Area-Fraction / Spalte Morel-Atlas ROIs
 # (4) Zeile Area-Fraction / Spalte AAN ROIs           [done]
-# (5) Zeile Area-Fraction / Spalte BN ROIs? 
+# (5) Zeile Area-Fraction / Spalte BN ROIs
 # (6) Zeile BrainstemNavigator / Spalte Morel-Atlas
 
 
@@ -18,13 +18,13 @@
 # (2)
 
 
-docker run \
-    -v ${PWD}:/code \
-    -v /mnt/h/Research/PainConn/Data:/data \
-    -e rois_seed="AreaFractionCC" \
-    -e rois_target="Harvard-AAN" \
-    leapp:proc.dev \
-    bash /code/roi2roi_connectivity.sh
+; docker run \
+;     -v ${PWD}:/code \
+;     -v /mnt/h/Research/PainConn/Data:/data \
+;     -e rois_seed="AreaFractionCC" \
+;     -e rois_target="Harvard-AAN" \
+;     leapp:proc.dev \
+;     bash /code/roi2roi_connectivity.sh
 
 
 
@@ -44,3 +44,60 @@ docker run \
 # Fri Oct 11 20:45:29 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-OP1-POperc-59
 # Sat Oct 12 01:37:48 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-OP4-POperc-62
 # Sat Oct 12 06:28:45 UTC 2024 roi2roi_connectivity.sh :  extract connectivity for seed ROI left-neg04-GS-Area-PF-IPL-39
+
+
+
+
+
+
+################
+# DEVELOPMENT
+################
+
+docker run \
+    -v /mnt/h/Research/PainConn/Data:/data \
+    -e seed="seed/roi_masks/left-neg04-GS-Area-5M-SPL-54.nii.gz" \
+    -e target="target" \
+    roi2roi
+
+
+seed="seed/roi_masks/left-neg04-GS-Area-5M-SPL-54.nii.gz"
+
+# seed="seed/roi_masks/left-neg04-GS-Area-5M-SPL-54.nii.gz"
+ # seed="seed"
+ # target="target"
+
+
+
+# ---- preparing singularity image from docker for cluster usage ---- #
+
+# docker save --output roi2roi.tar roi2roi
+# singularity build roi2roi.sif docker-archive://roi2roi.tar
+
+sftp beyp_c@hpc-transfer-1.cubi.bihealth.org
+cd /data/cephfs-1/home/users/beyp_c/work/projects/PainConnect
+put roi2roi.sif
+
+
+################
+# CLUSTER USAGE
+################
+
+ssh -A -t -l beyp_c hpc-login-1.cubi.bihealth.org
+srun --partition medium --pty bash -i
+
+Path=${HOME}/work/projects/PainConnect/
+
+Date=$(date '+%Y-%m-%d')
+LogDir=${Path}/Log-${Date}
+mkdir -p ${LogDir}
+
+
+Seed="AreaFractionCC"
+Target="Harvard-AAN"
+sbatch --ntasks=20 --mem-per-cpu=4G --job-name=test --partition=medium \
+    -o "${LogDir}/out_${Seed}-${Target}.txt" -e "${LogDir}/err_${Seed}-${Target}.txt" \
+    container/cluster_wrapper.sh \
+        -d "${Path}/data" \
+        -s "${Seed}" \
+        -t "${Target}"

@@ -91,10 +91,13 @@ RUN apt-get install figlet
 
 RUN pip install lolcat
 
+ENV TEMPLATEDIR="/templates"
+COPY Templates "/templates"
+
 RUN mkdir "/src"
 COPY code "/src"
 ENV SRCDIR="/src"
-
-ENV TEMPLATEDIR="/templates"
-COPY Templates "/templates"
 WORKDIR "/src"
+
+# ---- call run script ---- #
+CMD ["bash", "/src/run.sh"]

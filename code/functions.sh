@@ -49,17 +49,13 @@ get_roi_volume() {
 get_tract_subset() {
     # extract subset of tracts using ROI mask
     # from default normative tractogram
-    # $1 = ROI mask
+    # $1 = ROI target full mask
     # $2 = base tractogram [optional]
-    if [ -z ${2} ]; then
-        tck="${Path}/Templates/dTOR_full_tractogram.tck"
-    else
-        tck=${2}
-    fi
-    roi=$(basename ${1%_ribbon_bin.nii.gz})
+    roi=$(basename ${1%_full_mask.nii.gz})
+    wd=$( dirname ${1} )
     tckedit -force -quiet \
-        ${tck} \
-        "${TempDir}/${roi}.tck" \
+        ${2} \
+        "${wd}/${roi}.tck" \
         -include ${1}
 }
 
@@ -87,7 +83,7 @@ get_binary_volume() {
     #
     # ${1}: Target ROIs
     # ---- create initial empty volume
-    cp ${Path}/Templates/Empty.nii.gz \
+    cp ${TEMPLATEDIR}/Empty.nii.gz \
     ${TempDir}/${1}_ribbon.nii.gz
     # ---- concatenate ROI masks
     files="${Path}/${1}/roi_masks/*.nii.gz"
@@ -138,8 +134,9 @@ get_strength(){
 combine_weights() {
     # create concatenated connectivity matrix for all ROIs
     #
-    # ${1}: output filename
-    weight_files="${TempDir}/*.tsv"
+    # ${1}: input directory
+    # ${2}: output filename
+    weight_files="${1}/*.tsv"
     paste ${weight_files} > ${TempDir}/weights.tsv
-    python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${1}
+    python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${2}
 }
