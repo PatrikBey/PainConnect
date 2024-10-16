@@ -11,11 +11,12 @@
 
 
 # Priorities:
-# (3)
-# (5)
+# (3): Done
+# (5): Done
 # (1)
 # (6)
 # (2)
+# (4): Done
 
 
 ; docker run \
@@ -74,9 +75,9 @@ seed="seed/roi_masks/left-neg04-GS-Area-5M-SPL-54.nii.gz"
 # docker save --output roi2roi.tar roi2roi
 # singularity build roi2roi.sif docker-archive://roi2roi.tar
 
-sftp beyp_c@hpc-transfer-1.cubi.bihealth.org
-cd /data/cephfs-1/home/users/beyp_c/work/projects/PainConnect
-put roi2roi.sif
+# sftp beyp_c@hpc-transfer-1.cubi.bihealth.org
+# cd /data/cephfs-1/home/users/beyp_c/work/projects/PainConnect
+# put roi2roi.sif
 
 
 ################
@@ -86,18 +87,43 @@ put roi2roi.sif
 ssh -A -t -l beyp_c hpc-login-1.cubi.bihealth.org
 srun --partition medium --pty bash -i
 
-Path=${HOME}/work/projects/PainConnect/
+Path=${HOME}/work/projects/PainConnect
+
 
 Date=$(date '+%Y-%m-%d')
 LogDir=${Path}/Log-${Date}
 mkdir -p ${LogDir}
 
 
-Seed="AreaFractionCC"
-Target="Harvard-AAN"
-sbatch --ntasks=20 --mem-per-cpu=4G --job-name=test --partition=medium \
+# ---- full brain ROI based connectivity extraction ---- #
+
+Seed="BrainstemNavigator"
+Target="MorelAtlasMNI152"
+
+sbatch --ntasks=20 --mem-per-cpu=4G --job-name=BN-Mor --partition=medium \
     -o "${LogDir}/out_${Seed}-${Target}.txt" -e "${LogDir}/err_${Seed}-${Target}.txt" \
     container/cluster_wrapper.sh \
         -d "${Path}/data" \
         -s "${Seed}" \
         -t "${Target}"
+
+
+
+# ---- parallel single ROI based connectivity extraction ---- #
+
+
+Target="cytoatlas-Juelich"
+Seed="AreaFractionCC"
+cd $Path/data
+SeedROIS="${Seed}/roi_masks/*.nii.gz"
+
+
+for sroi in ${SeedROIS}; do
+    sbatch --ntasks=10 --mem-per-cpu=4G --job-name=single --partition=medium \
+        -o "${LogDir}/out_$( basename ${sroi%.nii.gz})-${Target}.txt" -e "${LogDir}/err_$( basename ${sroi%.nii.gz})-${Target}.txt" \
+        Code/cluster_wrapper.sh \
+            -d "${Path}/data" \
+            -s "${sroi}" \
+            -t "${Target}"
+done
+
